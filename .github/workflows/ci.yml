@@ -1,0 +1,19 @@
+# ABOUTME: GitHub Actions CI for GOssip — runs the canonical check (fmt, vet, test).
+# ABOUTME: Triggers on pushes to main and on all pull requests.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: ./scripts/check
