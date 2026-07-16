@@ -10,6 +10,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/2389/gossip/internal/event"
 )
 
 type Store struct {
@@ -136,4 +138,86 @@ func (s *Store) SetConfig(ctx context.Context, cfg Config) error {
 		}
 	}
 	return nil
+}
+
+// Append validates and inserts all events in one transaction. A retry with an
+// already-used idempotency key and identical (type, payload) returns the
+// canonical stored event; different content under a used key is an error.
+// Any failure rolls back the entire batch.
+func (s *Store) Append(ctx context.Context, evs ...event.Envelope) ([]event.Envelope, error) {
+	for _, e := range evs {
+		if err := e.Validate(); err != nil {
+			return nil, err
+		}
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("store: begin: %w", err)
+	}
+	defer tx.Rollback()
+
+	out := make([]event.Envelope, 0, len(evs))
+	for _, e := range evs {
+		var existing event.Envelope
+		var occurred, payload string
+		err := tx.QueryRowContext(ctx,
+			`SELECT id, type, schema_version, actor_id, principal_id, occurred_at, idempotency_key, payload
+			 FROM events WHERE idempotency_key = ?`, e.IdempotencyKey).
+			Scan(&existing.ID, &existing.Type, &existing.SchemaVersion, &existing.ActorID,
+				&existing.PrincipalID, &occurred, &existing.IdempotencyKey, &payload)
+		switch {
+		case err == nil:
+			if existing.Type != e.Type || payload != string(e.Payload) {
+				return nil, fmt.Errorf("store: idempotency key %q reused with different content", e.IdempotencyKey)
+			}
+			existing.OccurredAt, err = time.Parse(time.RFC3339Nano, occurred)
+			if err != nil {
+				return nil, fmt.Errorf("store: stored occurred_at %q: %w", occurred, err)
+			}
+			existing.Payload = json.RawMessage(payload)
+			out = append(out, existing)
+			continue
+		case err != sql.ErrNoRows:
+			return nil, fmt.Errorf("store: idempotency lookup: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO events(id, type, schema_version, actor_id, principal_id, occurred_at, idempotency_key, payload)
+			 VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
+			e.ID, e.Type, e.SchemaVersion, e.ActorID, e.PrincipalID,
+			e.OccurredAt.UTC().Format(time.RFC3339Nano), e.IdempotencyKey, string(e.Payload)); err != nil {
+			return nil, fmt.Errorf("store: insert %s: %w", e.ID, err)
+		}
+		out = append(out, e)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("store: commit: %w", err)
+	}
+	return out, nil
+}
+
+// Events returns every event in append order. Views fold this; nothing is
+// filtered here — the audit trail is the whole log.
+func (s *Store) Events(ctx context.Context) ([]event.Envelope, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, type, schema_version, actor_id, principal_id, occurred_at, idempotency_key, payload
+		 FROM events ORDER BY seq`)
+	if err != nil {
+		return nil, fmt.Errorf("store: query events: %w", err)
+	}
+	defer rows.Close()
+	var out []event.Envelope
+	for rows.Next() {
+		var e event.Envelope
+		var occurred, payload string
+		if err := rows.Scan(&e.ID, &e.Type, &e.SchemaVersion, &e.ActorID, &e.PrincipalID,
+			&occurred, &e.IdempotencyKey, &payload); err != nil {
+			return nil, fmt.Errorf("store: scan: %w", err)
+		}
+		if e.OccurredAt, err = time.Parse(time.RFC3339Nano, occurred); err != nil {
+			return nil, fmt.Errorf("store: stored occurred_at %q: %w", occurred, err)
+		}
+		e.Payload = json.RawMessage(payload)
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }
