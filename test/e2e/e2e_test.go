@@ -63,6 +63,36 @@ func idWithPrefix(t *testing.T, s, prefix string) string {
 	return ""
 }
 
+func TestDBFlagBeatsEnv(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	flagDB := filepath.Join(dir, "flag.db")
+	envDB := filepath.Join(dir, "env.db")
+
+	base := []string{
+		"PATH=" + os.Getenv("PATH"),
+		"HOME=" + t.TempDir(),
+		"GOSSIP_DB=" + envDB,
+		"GOSSIP_ACTOR_ID=mona",
+		"GOSSIP_PRINCIPAL_ID=team_mod",
+	}
+	c := cli{t, bin, base}
+
+	// Run init with --db pointing at flagDB; GOSSIP_DB points at envDB.
+	// The flag must win: flagDB gets created, envDB must not exist.
+	out := c.mustRun("--db", flagDB, "init", "--moderator", "team_mod")
+
+	if !strings.Contains(out, flagDB) {
+		t.Errorf("init output does not mention flagDB path; got:\n%s", out)
+	}
+	if _, err := os.Stat(flagDB); err != nil {
+		t.Errorf("flagDB was not created: %v", err)
+	}
+	if _, err := os.Stat(envDB); !os.IsNotExist(err) {
+		t.Errorf("envDB should not exist but stat returned: %v", err)
+	}
+}
+
 func TestFullLifecycle(t *testing.T) {
 	bin := buildBinary(t)
 	db := filepath.Join(t.TempDir(), "watercooler.db")
