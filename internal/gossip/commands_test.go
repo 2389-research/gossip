@@ -1,4 +1,4 @@
-// ABOUTME: Tests for mutating commands: compound thread creation and fail-closed posting.
+// ABOUTME: Tests for all mutating commands: threads, posts, corroborate, receipt, retract, hide.
 // ABOUTME: Every test runs against a real SQLite store in t.TempDir(); no mocks.
 package gossip
 
@@ -262,6 +262,33 @@ func TestHideModeratorGatedWithReason(t *testing.T) {
 	}
 }
 
+func TestHideModeratorGateCheckedBeforeReason(t *testing.T) {
+	c, s := testCmd(t, "a1", "p1")
+	ctx := context.Background()
+	_, postID, _ := c.StartThread(ctx, "t", "op", "", "")
+
+	// c is NOT on the moderator list. Empty reason: gate should fire first.
+	cfg, _ := s.Config(ctx)
+	cfg.Moderators = []string{"p_mod"}
+	if err := s.SetConfig(ctx, cfg); err != nil {
+		t.Fatalf("SetConfig: %v", err)
+	}
+
+	err := c.Hide(ctx, postID, "") // non-moderator, empty reason
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected ErrValidation, got %v", err)
+	}
+	// Must name the moderator gate, NOT the reason-required check.
+	const gateMsg = "is not on this store's moderator list"
+	const reasonMsg = "hide reason is required"
+	if !strings.Contains(err.Error(), gateMsg) {
+		t.Errorf("expected error to contain %q (moderator gate), got: %q", gateMsg, err.Error())
+	}
+	if strings.Contains(err.Error(), reasonMsg) {
+		t.Errorf("expected error NOT to contain %q (reason check should not run before gate), got: %q", reasonMsg, err.Error())
+	}
+}
+
 func TestHiddenPostTombstoneImmuneToLateEvidence(t *testing.T) {
 	c, s := testCmd(t, "a1", "p1")
 	ctx := context.Background()
@@ -284,6 +311,10 @@ func TestHiddenPostTombstoneImmuneToLateEvidence(t *testing.T) {
 	if len(tv.Posts) != 1 || !tv.Posts[0].Tombstone {
 		t.Fatalf("PIN(b): hidden post not tombstoned before late evidence: %+v", tv.Posts)
 	}
+	pv := tv.Posts[0]
+	if pv.Post.Hidden == nil {
+		t.Fatal("PIN(b): post view must have Hidden state set before late evidence")
+	}
 
 	// Late evidence (corroborate + receipt) against a hidden post must succeed.
 	c2 := &Cmd{Store: s, ID: Identity{ActorID: "a2", PrincipalID: "p2", Source: "env"}, Now: c.Now}
@@ -299,5 +330,9 @@ func TestHiddenPostTombstoneImmuneToLateEvidence(t *testing.T) {
 	tv2, _ := m2.Thread(thrID, c.Now.Add(time.Minute))
 	if len(tv2.Posts) != 1 || !tv2.Posts[0].Tombstone {
 		t.Fatalf("PIN(b): tombstone lost after late evidence: %+v", tv2.Posts)
+	}
+	pv2 := tv2.Posts[0]
+	if pv2.Post.Hidden == nil {
+		t.Fatal("PIN(b): post view must have Hidden state set after late evidence")
 	}
 }

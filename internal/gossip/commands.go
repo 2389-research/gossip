@@ -178,9 +178,6 @@ func (c *Cmd) Retract(ctx context.Context, postID, reason string) error {
 // ADVISORY: comparing a declared principal to a config list is not
 // authenticated, and anyone with file access can bypass the CLI entirely.
 func (c *Cmd) Hide(ctx context.Context, postID, reason string) error {
-	if strings.TrimSpace(reason) == "" {
-		return validationErr("hide reason is required")
-	}
 	cfg, err := c.Store.Config(ctx)
 	if err != nil {
 		return err
@@ -194,6 +191,9 @@ func (c *Cmd) Hide(ctx context.Context, postID, reason string) error {
 	}
 	if !isMod {
 		return validationErr("declared principal %q is not on this store's moderator list (advisory gate)", c.ID.PrincipalID)
+	}
+	if strings.TrimSpace(reason) == "" {
+		return validationErr("hide reason is required")
 	}
 	m, err := c.model(ctx)
 	if err != nil {
