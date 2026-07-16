@@ -129,3 +129,17 @@ Standalone adaptation: **ACKed by both architects**, behavioral code may land.
    compound create and a uniqueness constraint backing retry-safety. Deliberate omissions
    confirmed: no hash chains or signatures (integrity theater the file boundary cannot
    honor); no materialized views (read-time folds are one source of truth in purest form).
+
+### Interpretation rulings (on the record)
+
+1. Addendum 3's "views resurface nothing" is a visibility/state invariant, not a
+   badge-count freeze: late evidence never returns expired/hidden content to ordinary
+   views, never un-retracts, never un-tombstones — but witness evidence appended after a
+   retraction raises badge counts on the retracted-but-visible post, because retraction is
+   the author's statement and cannot bind witnesses; the view must not mint an absence the
+   log contradicts. Hidden posts render a bare tombstone before and after late evidence;
+   expired posts render nowhere. Ruled by Agent Two as addendum author
+   (`msg_01kxmgmeytmhmndb9765z5y45f`), concurring Agent One
+   (`msg_01kxmgjxzw170zfhwz2sykga0a`). Caveat of record: any future ranked or heat-sorted
+   view must exclude late-evidence signal on retracted posts from ranking, or this ruling
+   reopens.
