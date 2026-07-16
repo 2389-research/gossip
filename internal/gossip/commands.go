@@ -149,6 +149,68 @@ func (c *Cmd) Receipt(ctx context.Context, postID, ref string) error {
 	return err
 }
 
+// Retract is the author's own correction: visible forever, badged retracted.
+// Author-only compares declared actor IDs — the strongest claim v1 can make.
+func (c *Cmd) Retract(ctx context.Context, postID, reason string) error {
+	if strings.TrimSpace(reason) == "" {
+		return validationErr("retraction reason is required")
+	}
+	m, err := c.model(ctx)
+	if err != nil {
+		return err
+	}
+	p, ok := m.Post(postID)
+	if !ok {
+		return validationErr("post %q not found in this store", postID)
+	}
+	if p.AuthorActor != c.ID.ActorID {
+		return validationErr("only the post author may retract (author: %s)", p.AuthorActor)
+	}
+	if p.Retracted != nil {
+		return validationErr("post %q is already retracted", postID)
+	}
+	_, err = c.Store.Append(ctx, c.envelope(event.KindPostRetracted, newID("cmd")+"/retract",
+		event.PostRetracted{PostID: postID, Reason: reason}))
+	return err
+}
+
+// Hide is a safety action gated on the store's moderator list. The gate is
+// ADVISORY: comparing a declared principal to a config list is not
+// authenticated, and anyone with file access can bypass the CLI entirely.
+func (c *Cmd) Hide(ctx context.Context, postID, reason string) error {
+	if strings.TrimSpace(reason) == "" {
+		return validationErr("hide reason is required")
+	}
+	cfg, err := c.Store.Config(ctx)
+	if err != nil {
+		return err
+	}
+	isMod := false
+	for _, mod := range cfg.Moderators {
+		if mod == c.ID.PrincipalID {
+			isMod = true
+			break
+		}
+	}
+	if !isMod {
+		return validationErr("declared principal %q is not on this store's moderator list (advisory gate)", c.ID.PrincipalID)
+	}
+	m, err := c.model(ctx)
+	if err != nil {
+		return err
+	}
+	p, ok := m.Post(postID)
+	if !ok {
+		return validationErr("post %q not found in this store", postID)
+	}
+	if p.Hidden != nil {
+		return validationErr("post %q is already hidden", postID)
+	}
+	_, err = c.Store.Append(ctx, c.envelope(event.KindPostHidden, newID("cmd")+"/hide",
+		event.PostHidden{PostID: postID, Reason: reason}))
+	return err
+}
+
 // Post appends one post. Refs must resolve to a post or thread in THIS store;
 // missing or foreign refs fail closed (the confused-deputy lesson).
 func (c *Cmd) Post(ctx context.Context, threadID, body, label, ttl string, refs []string) (string, error) {

@@ -158,3 +158,146 @@ func TestReceiptRequiresPostAndNonEmptyRef(t *testing.T) {
 		t.Fatalf("valid receipt rejected: %v", err)
 	}
 }
+
+func TestLateEvidenceIsLegalAndResurfacesNothing(t *testing.T) {
+	c, s := testCmd(t, "a1", "p1")
+	ctx := context.Background()
+	thrID, postID, _ := c.StartThread(ctx, "t", "op", "", "")
+	if err := c.Retract(ctx, postID, "wrong"); err != nil {
+		t.Fatalf("retract: %v", err)
+	}
+	// Evidence against a retracted post still appends (witness testimony is
+	// the witness's statement) and the view stays retracted.
+	c2 := &Cmd{Store: s, ID: Identity{ActorID: "a2", PrincipalID: "p2", Source: "env"}, Now: c.Now}
+	if err := c2.Corroborate(ctx, postID); err != nil {
+		t.Fatalf("late corroboration rejected: %v", err)
+	}
+	if err := c2.Receipt(ctx, postID, "late-receipt"); err != nil {
+		t.Fatalf("late receipt rejected: %v", err)
+	}
+	m := modelOf(t, s)
+	p, _ := m.Post(postID)
+	if p.Retracted == nil {
+		t.Fatal("late evidence un-retracted the post")
+	}
+	tv, _ := m.Thread(thrID, c.Now.Add(time.Minute))
+	for _, pv := range tv.Posts {
+		if pv.Post.ID == postID && pv.Tombstone {
+			t.Fatal("retracted post tombstoned — retracted stays visible, badged")
+		}
+	}
+
+	// PIN (a): badge counts rise on retracted-but-visible posts.
+	// The different-principal actor (c2, "p2") corroborated above — count must be 1.
+	// Retraction is the author's statement and cannot bind witnesses.
+	if b := p.Badges(); b.DifferentPrincipal != 1 {
+		t.Fatalf("PIN(a): DifferentPrincipal badge = %d, want 1 after late corroboration by p2", b.DifferentPrincipal)
+	}
+	// Post must appear in thread view non-tombstoned with Retracted state set.
+	found := false
+	for _, pv := range tv.Posts {
+		if pv.Post.ID == postID {
+			found = true
+			if pv.Tombstone {
+				t.Fatal("PIN(a): retracted post must not be tombstoned in thread view")
+			}
+			if pv.Post.Retracted == nil {
+				t.Fatal("PIN(a): post in view must have Retracted state set")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("PIN(a): retracted post must appear in thread view")
+	}
+}
+
+func TestRetractAuthorOnlyWithReason(t *testing.T) {
+	c, s := testCmd(t, "a1", "p1")
+	ctx := context.Background()
+	_, postID, _ := c.StartThread(ctx, "t", "op", "", "")
+
+	other := &Cmd{Store: s, ID: Identity{ActorID: "a2", PrincipalID: "p1", Source: "env"}, Now: c.Now}
+	if err := other.Retract(ctx, postID, "nope"); !errors.Is(err, ErrValidation) {
+		t.Fatalf("non-author retraction accepted: %v", err)
+	}
+	if err := c.Retract(ctx, postID, ""); !errors.Is(err, ErrValidation) {
+		t.Fatalf("empty reason accepted: %v", err)
+	}
+	if err := c.Retract(ctx, postID, "jumped to conclusions"); err != nil {
+		t.Fatalf("valid retraction rejected: %v", err)
+	}
+	if err := c.Retract(ctx, postID, "again"); !errors.Is(err, ErrValidation) {
+		t.Fatalf("double retraction accepted: %v", err)
+	}
+}
+
+func TestHideModeratorGatedWithReason(t *testing.T) {
+	c, s := testCmd(t, "a1", "p1")
+	ctx := context.Background()
+	thrID, postID, _ := c.StartThread(ctx, "t", "leaked token here", "", "")
+
+	// Not a moderator: advisory gate denies at the honest-client boundary.
+	if err := c.Hide(ctx, postID, "credential leakage"); !errors.Is(err, ErrValidation) {
+		t.Fatalf("non-moderator hide accepted: %v", err)
+	}
+	cfg, _ := s.Config(ctx)
+	cfg.Moderators = []string{"p_mod"}
+	if err := s.SetConfig(ctx, cfg); err != nil {
+		t.Fatalf("SetConfig: %v", err)
+	}
+	mod := &Cmd{Store: s, ID: Identity{ActorID: "a9", PrincipalID: "p_mod", Source: "env"}, Now: c.Now}
+	if err := mod.Hide(ctx, postID, ""); !errors.Is(err, ErrValidation) {
+		t.Fatalf("empty hide reason accepted: %v", err)
+	}
+	if err := mod.Hide(ctx, postID, "credential leakage"); err != nil {
+		t.Fatalf("moderator hide rejected: %v", err)
+	}
+	if err := mod.Hide(ctx, postID, "again"); !errors.Is(err, ErrValidation) {
+		t.Fatalf("double hide accepted: %v", err)
+	}
+	m := modelOf(t, s)
+	tv, _ := m.Thread(thrID, c.Now.Add(time.Minute))
+	if len(tv.Posts) != 1 || !tv.Posts[0].Tombstone {
+		t.Fatalf("hidden post not tombstoned: %+v", tv.Posts)
+	}
+}
+
+func TestHiddenPostTombstoneImmuneToLateEvidence(t *testing.T) {
+	c, s := testCmd(t, "a1", "p1")
+	ctx := context.Background()
+	thrID, postID, _ := c.StartThread(ctx, "t", "sensitive content", "", "")
+
+	// Set up moderator and hide the post.
+	cfg, _ := s.Config(ctx)
+	cfg.Moderators = []string{"p_mod"}
+	if err := s.SetConfig(ctx, cfg); err != nil {
+		t.Fatalf("SetConfig: %v", err)
+	}
+	mod := &Cmd{Store: s, ID: Identity{ActorID: "a9", PrincipalID: "p_mod", Source: "env"}, Now: c.Now}
+	if err := mod.Hide(ctx, postID, "safety"); err != nil {
+		t.Fatalf("hide: %v", err)
+	}
+
+	// PIN (b) model half: thread view must tombstone the hidden post.
+	m := modelOf(t, s)
+	tv, _ := m.Thread(thrID, c.Now.Add(time.Minute))
+	if len(tv.Posts) != 1 || !tv.Posts[0].Tombstone {
+		t.Fatalf("PIN(b): hidden post not tombstoned before late evidence: %+v", tv.Posts)
+	}
+
+	// Late evidence (corroborate + receipt) against a hidden post must succeed.
+	c2 := &Cmd{Store: s, ID: Identity{ActorID: "a2", PrincipalID: "p2", Source: "env"}, Now: c.Now}
+	if err := c2.Corroborate(ctx, postID); err != nil {
+		t.Fatalf("PIN(b): late corroboration against hidden post rejected: %v", err)
+	}
+	if err := c2.Receipt(ctx, postID, "late-receipt-hidden"); err != nil {
+		t.Fatalf("PIN(b): late receipt against hidden post rejected: %v", err)
+	}
+
+	// PIN (b) model half: tombstone must survive late evidence.
+	m2 := modelOf(t, s)
+	tv2, _ := m2.Thread(thrID, c.Now.Add(time.Minute))
+	if len(tv2.Posts) != 1 || !tv2.Posts[0].Tombstone {
+		t.Fatalf("PIN(b): tombstone lost after late evidence: %+v", tv2.Posts)
+	}
+}
