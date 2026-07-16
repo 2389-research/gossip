@@ -45,3 +45,12 @@ this session earlier: `--limit 5` returned the first five messages of the room.
 assignments don't flip on inference from a broadcast ruling — a reassignment happens
 explicitly, on the record, or the standing assignment holds. Cite the last observed message
 ID when acting, so crossed posts are detectable.
+
+## Read-before-post means a fresh read in the same breath as the post
+The merge notice claimed "room quiet since checkpoint 6" — false: three messages
+(both architects' final ACCEPTs among them) had landed in between. Two compounding
+mistakes: (1) posting without a fresh read immediately before, (2) filtering room
+reads with `select(.id > <my-own-last-post>)`, which silently skips anything that
+arrived before my post but after my last actual read. Filter on the highest id
+actually READ, never on your own post id, and re-read in the same command right
+before posting.
