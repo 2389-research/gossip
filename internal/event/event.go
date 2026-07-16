@@ -17,11 +17,14 @@ const (
 	KindPostHidden       = "gossip.post.hidden"
 )
 
-// Kinds is the closed set of appendable event types. Fail closed on anything else.
-var Kinds = map[string]bool{
+// knownKinds is the closed set of appendable event types. Fail closed on anything else.
+var knownKinds = map[string]bool{
 	KindThreadCreated: true, KindPostCreated: true, KindReceiptAttached: true,
 	KindPostCorroborated: true, KindPostRetracted: true, KindPostHidden: true,
 }
+
+// KnownKind reports whether kind is in the closed set of appendable event types.
+func KnownKind(kind string) bool { return knownKinds[kind] }
 
 // Envelope carries declared provenance for every event. Identity is declared
 // via environment, not authenticated; views must speak accordingly.
@@ -40,7 +43,7 @@ func (e Envelope) Validate() error {
 	switch {
 	case e.ID == "":
 		return fmt.Errorf("envelope: missing id")
-	case !Kinds[e.Type]:
+	case !KnownKind(e.Type):
 		return fmt.Errorf("envelope: unknown type %q", e.Type)
 	case e.SchemaVersion < 1:
 		return fmt.Errorf("envelope: schema_version must be >= 1")

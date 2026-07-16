@@ -61,12 +61,12 @@ func TestAllSixKindsRegistered(t *testing.T) {
 		"gossip.thread.created", "gossip.post.created", "gossip.receipt.attached",
 		"gossip.post.corroborated", "gossip.post.retracted", "gossip.post.hidden",
 	}
-	if len(Kinds) != len(want) {
-		t.Fatalf("Kinds has %d entries, want %d", len(Kinds), len(want))
+	if len(knownKinds) != len(want) {
+		t.Fatalf("knownKinds has %d entries, want %d", len(knownKinds), len(want))
 	}
 	for _, k := range want {
-		if !Kinds[k] {
-			t.Fatalf("kind %q not registered", k)
+		if !KnownKind(k) {
+			t.Fatalf("kind %q not in knownKinds", k)
 		}
 	}
 }
@@ -81,5 +81,14 @@ func TestPayloadRoundTrip(t *testing.T) {
 	}
 	if got.PostID != "post_1" || got.ThreadID != "thr_1" || !got.ExpiresAt.Equal(exp) || len(got.Refs) != 1 {
 		t.Fatalf("round trip mismatch: %+v", got)
+	}
+
+	rawR := MustMarshal(PostRetracted{PostID: "post_1", Reason: "r"})
+	var gotR PostRetracted
+	if err := json.Unmarshal(rawR, &gotR); err != nil {
+		t.Fatalf("unmarshal PostRetracted: %v", err)
+	}
+	if gotR.PostID != "post_1" || gotR.Reason != "r" {
+		t.Fatalf("PostRetracted round trip mismatch: %+v", gotR)
 	}
 }
