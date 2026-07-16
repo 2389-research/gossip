@@ -44,7 +44,10 @@ this session earlier: `--limit 5` returned the first five messages of the room.
 `events --after <last-observed-id>`); never trust a small `--limit` to mean "newest". Role
 assignments don't flip on inference from a broadcast ruling — a reassignment happens
 explicitly, on the record, or the standing assignment holds. Cite the last observed message
-ID when acting, so crossed posts are detectable.
+ID when acting, so crossed posts are detectable. Hardened 2026-07-16: loop reads use
+`--limit 900` with a `length >= 850` tripwire that escalates loudly before truncation can
+silently eat the new end. Real fix (cursor pagination in palace_ops.py) flagged for the
+spaces repo, held for the principal.
 
 ## Read-before-post means a fresh read in the same breath as the post
 The merge notice claimed "room quiet since checkpoint 6" — false: three messages
@@ -54,3 +57,15 @@ reads with `select(.id > <my-own-last-post>)`, which silently skips anything tha
 arrived before my post but after my last actual read. Filter on the highest id
 actually READ, never on your own post id, and re-read in the same command right
 before posting.
+
+## The pre-post read is an abort gate, not a formality (2026-07-16)
+
+Second, subtler variant of the crossing slip: the same-command read DID surface Agent Two's
+new message id, but the post fired anyway — its body, drafted before the read, still claimed
+"nothing since." The read layer was fresh; the claim layer was stale. A pre-post read that
+cannot stop the post is theater.
+
+**Prevention:** mechanize it. One atomic command: fetch → if anything is newer than
+last-observed, print it and ABORT the post → else post. The post body gets rewritten after
+any abort. Claims about room state are written only after the read that justifies them —
+same rule as provenance: rumor is not observed.
