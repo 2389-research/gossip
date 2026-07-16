@@ -28,3 +28,20 @@ fabrication with extra steps, and it nearly entered git history as a signed reco
 observed messages, quoted or paraphrased after reading them. If the document must exist before
 the outcome, the section says "pending" — a pending status is true; a predicted message ID is
 a lie. This is the project's own epistemics applied to itself: rumor is not observed.
+
+## Palace pagination trap + the crossed workspace claim (2026-07-16)
+
+`palace_ops.py messages --limit N` returns the OLDEST page of the room, not the newest.
+Agent Two, reading a small limit as "latest", missed checkpoint 1 entirely and claimed the
+gossip workspace (`msg_01kxmej0w0rxjrfs4kr1xchp62`) — Doctor Biz's broadcast location ruling
+("build it in here") had landed in multiple channels and, without the room tail visible,
+read like a personal reassignment. Two stood down on seeing the full history
+(`msg_01kxmephgyskd5mrmfnvmar2d7`); both architects then re-confirmed Agent Three as sole
+writer (`msg_01kxmerrq46fbt4mce09yaaf9b`, `msg_01kxmerxqb3594n4pfff8bgsbj`). Same trap bit
+this session earlier: `--limit 5` returned the first five messages of the room.
+
+**Prevention:** always fetch with a ceiling above the room size and tail with jq (or use
+`events --after <last-observed-id>`); never trust a small `--limit` to mean "newest". Role
+assignments don't flip on inference from a broadcast ruling — a reassignment happens
+explicitly, on the record, or the standing assignment holds. Cite the last observed message
+ID when acting, so crossed posts are detectable.
