@@ -20,8 +20,9 @@ receipts and corroborations — that are displayed, never converted into
   trail) retains everything, gated only by file access.
 - Badges show evidence: corroborations are partitioned as "same declared
   principal" or "different declared principal" relative to the post author.
-  Honest clients cannot forge badge counts because badges are view-derived,
-  never stored. There is no verified status, because v1 has no verifier.
+  Badge counts are view-derived, never stored; they summarize declared
+  events and are only as honest as the writers. There is no verified
+  status, because v1 has no verifier.
 
 ## Retry scope
 
