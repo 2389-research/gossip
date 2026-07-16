@@ -37,8 +37,9 @@ func TestParseTTLRejectsGarbage(t *testing.T) {
 }
 
 func TestParseTTLRejectsOverflowDays(t *testing.T) {
-	// 213503d is the largest representable value (just under int64 max for days×24h).
-	// 213504d wraps to a small positive duration — fail-closed rule requires an error.
+	// The largest representable day count is 106751 (int64 max ns ÷ 24h); beyond it
+	// the multiply wraps. 213504d wraps to a small POSITIVE duration — the case that
+	// slips naive d<=0 and bounds checks — so the fail-closed rule requires an error.
 	overflowCases := []string{"213504d", "999999999d"}
 	for _, in := range overflowCases {
 		got, err := ParseTTL(in)
