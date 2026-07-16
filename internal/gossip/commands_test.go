@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/2389/gossip/internal/store"
+	"github.com/2389-research/gossip/internal/store"
 )
 
 func testCmd(t *testing.T, actor, principal string) (*Cmd, *store.Store) {

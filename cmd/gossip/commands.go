@@ -11,8 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/2389/gossip/internal/gossip"
-	"github.com/2389/gossip/internal/store"
+	"github.com/2389-research/gossip/internal/gossip"
+	"github.com/2389-research/gossip/internal/store"
 )
 
 type app struct {

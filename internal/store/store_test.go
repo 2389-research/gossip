@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/2389/gossip/internal/event"
+	"github.com/2389-research/gossip/internal/event"
 )
 
 func openTemp(t *testing.T) *Store {

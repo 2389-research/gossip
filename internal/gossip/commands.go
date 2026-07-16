@@ -11,8 +11,8 @@ import (
 
 	"github.com/oklog/ulid/v2"
 
-	"github.com/2389/gossip/internal/event"
-	"github.com/2389/gossip/internal/store"
+	"github.com/2389-research/gossip/internal/event"
+	"github.com/2389-research/gossip/internal/store"
 )
 
 // ErrValidation marks domain-validation failures (exit 1 at the CLI, message shown).

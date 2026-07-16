@@ -11,7 +11,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/2389/gossip/internal/event"
+	"github.com/2389-research/gossip/internal/event"
 )
 
 type Store struct {

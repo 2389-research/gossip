@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/2389/gossip/internal/event"
+	"github.com/2389-research/gossip/internal/event"
 )
 
 type Receipt struct {

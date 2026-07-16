@@ -10,7 +10,7 @@
 
 ## Project rules
 
-- Module: `github.com/2389/gossip`
+- Module: `github.com/2389-research/gossip`
 - Standalone by ruling of Doctor Biz (2026-07-16): no Palace dependency. Identity is env/config-declared; the store file is the trust boundary. Say so in user-facing docs; never imply stronger guarantees.
 - All `.go` files start with two `// ABOUTME:` lines.
 - TDD: write the failing test first, always.

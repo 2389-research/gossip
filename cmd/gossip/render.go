@@ -9,8 +9,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/2389/gossip/internal/gossip"
-	"github.com/2389/gossip/internal/store"
+	"github.com/2389-research/gossip/internal/gossip"
+	"github.com/2389-research/gossip/internal/store"
 )
 
 func foldStore(ctx context.Context, s *store.Store) (*gossip.Model, error) {

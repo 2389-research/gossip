@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/2389/gossip/internal/event"
+	"github.com/2389-research/gossip/internal/event"
 )
 
 var t0 = time.Date(2026, 7, 16, 3, 0, 0, 0, time.UTC)

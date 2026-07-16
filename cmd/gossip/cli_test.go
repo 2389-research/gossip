@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/2389/gossip/internal/gossip"
-	"github.com/2389/gossip/internal/store"
+	"github.com/2389-research/gossip/internal/gossip"
+	"github.com/2389-research/gossip/internal/store"
 )
 
 func runCLI(t *testing.T, env map[string]string, now time.Time, args ...string) (string, error) {

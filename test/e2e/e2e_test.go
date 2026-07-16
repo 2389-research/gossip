@@ -13,7 +13,7 @@ import (
 func buildBinary(t *testing.T) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), "gossip")
-	cmd := exec.Command("go", "build", "-o", bin, "github.com/2389/gossip/cmd/gossip")
+	cmd := exec.Command("go", "build", "-o", bin, "github.com/2389-research/gossip/cmd/gossip")
 	cmd.Dir = repoRoot(t)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)

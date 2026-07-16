@@ -1,4 +1,4 @@
-module github.com/2389/gossip
+module github.com/2389-research/gossip
 
 go 1.26.5
 
