@@ -111,6 +111,44 @@ func (c *Cmd) StartThread(ctx context.Context, title, body, label, ttl string) (
 	return thrID, postID, nil
 }
 
+// Corroborate asserts first-hand observation of a post by a DIFFERENT declared
+// actor. Legal against retracted/hidden/expired posts: late witness testimony
+// appends to the audit trail and views resurface nothing.
+func (c *Cmd) Corroborate(ctx context.Context, postID string) error {
+	m, err := c.model(ctx)
+	if err != nil {
+		return err
+	}
+	p, ok := m.Post(postID)
+	if !ok {
+		return validationErr("post %q not found in this store", postID)
+	}
+	if p.AuthorActor == c.ID.ActorID {
+		return validationErr("corroborator must differ from post author (self-attestation caps at observed)")
+	}
+	_, err = c.Store.Append(ctx, c.envelope(event.KindPostCorroborated, newID("cmd")+"/corroborate",
+		event.PostCorroborated{PostID: postID}))
+	return err
+}
+
+// Receipt attaches machine-checkable evidence BY REFERENCE. The ref is an
+// opaque string: stored and displayed, never fetched, never resolved in-store.
+func (c *Cmd) Receipt(ctx context.Context, postID, ref string) error {
+	if strings.TrimSpace(ref) == "" {
+		return validationErr("receipt ref must not be empty")
+	}
+	m, err := c.model(ctx)
+	if err != nil {
+		return err
+	}
+	if _, ok := m.Post(postID); !ok {
+		return validationErr("post %q not found in this store", postID)
+	}
+	_, err = c.Store.Append(ctx, c.envelope(event.KindReceiptAttached, newID("cmd")+"/receipt",
+		event.ReceiptAttached{PostID: postID, ReceiptRef: ref}))
+	return err
+}
+
 // Post appends one post. Refs must resolve to a post or thread in THIS store;
 // missing or foreign refs fail closed (the confused-deputy lesson).
 func (c *Cmd) Post(ctx context.Context, threadID, body, label, ttl string, refs []string) (string, error) {

@@ -118,3 +118,43 @@ func TestPostRefsFailClosed(t *testing.T) {
 	}
 	_ = s
 }
+
+func TestCorroborateRejectsSelfAndMissingPost(t *testing.T) {
+	c, _ := testCmd(t, "a1", "p1")
+	ctx := context.Background()
+	_, postID, _ := c.StartThread(ctx, "t", "op", "", "")
+
+	if err := c.Corroborate(ctx, postID); !errors.Is(err, ErrValidation) {
+		t.Fatalf("self-corroboration accepted: %v", err)
+	}
+	if err := c.Corroborate(ctx, "post_missing"); !errors.Is(err, ErrValidation) {
+		t.Fatalf("missing post accepted: %v", err)
+	}
+
+	// A different declared actor (same store) may corroborate — even same principal.
+	c2 := &Cmd{Store: c.Store, ID: Identity{ActorID: "a2", PrincipalID: "p1", Source: "env"}, Now: c.Now}
+	if err := c2.Corroborate(ctx, postID); err != nil {
+		t.Fatalf("valid corroboration rejected: %v", err)
+	}
+	m := modelOf(t, c.Store)
+	p, _ := m.Post(postID)
+	if b := p.Badges(); b.SamePrincipal != 1 {
+		t.Fatalf("badges = %+v, want one same-declared-principal corroboration", b)
+	}
+}
+
+func TestReceiptRequiresPostAndNonEmptyRef(t *testing.T) {
+	c, _ := testCmd(t, "a1", "p1")
+	ctx := context.Background()
+	_, postID, _ := c.StartThread(ctx, "t", "op", "", "")
+
+	if err := c.Receipt(ctx, postID, ""); !errors.Is(err, ErrValidation) {
+		t.Fatalf("empty receipt ref accepted: %v", err)
+	}
+	if err := c.Receipt(ctx, "post_missing", "x"); !errors.Is(err, ErrValidation) {
+		t.Fatalf("missing post accepted: %v", err)
+	}
+	if err := c.Receipt(ctx, postID, "cmd/palace/main.go static inspection"); err != nil {
+		t.Fatalf("valid receipt rejected: %v", err)
+	}
+}
