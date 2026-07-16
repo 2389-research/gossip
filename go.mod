@@ -2,7 +2,10 @@ module github.com/2389/gossip
 
 go 1.26.5
 
-require modernc.org/sqlite v1.53.0
+require (
+	github.com/oklog/ulid/v2 v2.1.1
+	modernc.org/sqlite v1.53.0
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
