@@ -75,7 +75,7 @@ func TestBadgesPartitionByDeclaredPrincipal(t *testing.T) {
 	}
 }
 
-func TestRetractedStaysVisibleBadged(t *testing.T) {
+func TestRetractedStaysVisible(t *testing.T) {
 	m := fixture(t)
 	tv, err := m.Thread("thr_1", t0.Add(10*time.Minute))
 	if err != nil {

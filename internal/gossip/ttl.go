@@ -21,6 +21,11 @@ func ParseTTL(s string) (time.Duration, error) {
 			return 0, fmt.Errorf("ttl: invalid day count %q", s)
 		}
 		d = time.Duration(days) * 24 * time.Hour
+		// Verify the multiply didn't silently overflow: if it did, the round-trip
+		// back to days won't match. Overflow is an input error, never a silent wrap.
+		if int64(d)/int64(24*time.Hour) != int64(days) {
+			return 0, fmt.Errorf("ttl: day count %d overflows representable duration", days)
+		}
 	} else {
 		var err error
 		if d, err = time.ParseDuration(s); err != nil {

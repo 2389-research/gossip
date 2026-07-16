@@ -233,9 +233,10 @@ func newRootCmd(getenv func(string) string, now func() time.Time, out io.Writer)
 		Short: "Hide a post from ordinary views (moderators; advisory gate)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if hideReason == "" {
-				return fmt.Errorf("--reason is required")
-			}
+			// No CLI-layer reason pre-check: the internal layer checks the
+			// moderator gate BEFORE the reason, enforcing the mandate at every
+			// layer. Letting the internal layer own the ordering is the single
+			// source of truth.
 			c, s, err := a.cmd()
 			if err != nil {
 				return err

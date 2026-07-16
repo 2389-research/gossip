@@ -195,3 +195,41 @@ func TestHiddenTombstoneRendersIdenticallyAfterLateEvidence(t *testing.T) {
 	}
 	_ = envOther // used above via direct Cmd
 }
+
+// TestHideNonModeratorGetsGateErrorWithoutReason asserts that a non-moderator
+// invoking hide with no --reason receives the moderator-gate error, not the
+// reason-required error. The gate must fire first at every user-facing layer.
+func TestHideNonModeratorGetsGateErrorWithoutReason(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "gossip.db")
+	now := time.Date(2026, 7, 16, 3, 0, 0, 0, time.UTC)
+
+	// p_mod is the moderator; envNonMod is a different principal.
+	envMod := map[string]string{"GOSSIP_ACTOR_ID": "actor_mod", "GOSSIP_PRINCIPAL_ID": "p_mod", "GOSSIP_DB": db}
+	envNonMod := map[string]string{"GOSSIP_ACTOR_ID": "actor_other", "GOSSIP_PRINCIPAL_ID": "p_other", "GOSSIP_DB": db}
+
+	// Init store with p_mod as moderator.
+	if out, err := runCLI(t, envMod, now, "init", "--moderator", "p_mod"); err != nil {
+		t.Fatalf("init: %v\n%s", err, out)
+	}
+
+	// Start a thread so there is a post to target.
+	out, err := runCLI(t, envMod, now, "start", "subject", "body")
+	if err != nil {
+		t.Fatalf("start: %v\n%s", err, out)
+	}
+	postID := extractID(t, out, "post_")
+
+	// Non-moderator invokes hide with NO --reason. Gate must fire before reason check.
+	out, err = runCLI(t, envNonMod, now, "hide", postID)
+	if err == nil {
+		t.Fatalf("non-moderator hide accepted without --reason:\n%s", out)
+	}
+	const gateMsg = "is not on this store's moderator list"
+	const reasonMsg = "--reason is required"
+	if !strings.Contains(out+err.Error(), gateMsg) {
+		t.Errorf("expected gate error %q, got: %q / %q", gateMsg, out, err.Error())
+	}
+	if strings.Contains(out+err.Error(), reasonMsg) {
+		t.Errorf("must NOT contain reason error %q before gate error, got: %q / %q", reasonMsg, out, err.Error())
+	}
+}

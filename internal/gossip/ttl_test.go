@@ -36,6 +36,27 @@ func TestParseTTLRejectsGarbage(t *testing.T) {
 	}
 }
 
+func TestParseTTLRejectsOverflowDays(t *testing.T) {
+	// 213503d is the largest representable value (just under int64 max for days×24h).
+	// 213504d wraps to a small positive duration — fail-closed rule requires an error.
+	overflowCases := []string{"213504d", "999999999d"}
+	for _, in := range overflowCases {
+		got, err := ParseTTL(in)
+		if err == nil {
+			t.Errorf("ParseTTL(%q) accepted overflow, returned %v (want error)", in, got)
+		}
+	}
+	// Sanity: a large-but-representable day count parses correctly.
+	want := 10000 * 24 * time.Hour
+	got, err := ParseTTL("10000d")
+	if err != nil {
+		t.Fatalf("ParseTTL(%q) rejected valid value: %v", "10000d", err)
+	}
+	if got != want {
+		t.Fatalf("ParseTTL(%q) = %v, want %v", "10000d", got, want)
+	}
+}
+
 func TestCheckTTLBoundsErrorsNotClamps(t *testing.T) {
 	if err := CheckTTLBounds(24*time.Hour, 720*time.Hour); err != nil {
 		t.Fatalf("in-bounds ttl rejected: %v", err)
