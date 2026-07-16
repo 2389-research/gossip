@@ -38,6 +38,16 @@ func ParseTTL(s string) (time.Duration, error) {
 	return d, nil
 }
 
+// CheckConfigBounds rejects a config whose default TTL exceeds its max —
+// a store whose default post is guaranteed to fail its own maximum.
+// Equality is valid.
+func CheckConfigBounds(defaultTTL, maxTTL time.Duration) error {
+	if defaultTTL > maxTTL {
+		return fmt.Errorf("config: default_ttl %v exceeds max_ttl %v", defaultTTL, maxTTL)
+	}
+	return nil
+}
+
 // CheckTTLBounds fails closed: an out-of-bounds TTL is the speaker's error to
 // fix, never the store's to silently rewrite.
 func CheckTTLBounds(ttl, max time.Duration) error {

@@ -3,6 +3,7 @@
 package gossip
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -38,16 +39,17 @@ func TestParseTTLRejectsGarbage(t *testing.T) {
 
 func TestParseTTLRejectsOverflowDays(t *testing.T) {
 	// The largest representable day count is 106751 (int64 max ns ÷ 24h); beyond it
-	// the multiply wraps. 213504d wraps to a small POSITIVE duration — the case that
-	// slips naive d<=0 and bounds checks — so the fail-closed rule requires an error.
-	overflowCases := []string{"213504d", "999999999d"}
+	// the multiply wraps. 106752d is the smallest wrapping value (wraps negative).
+	// 213504d wraps to a small POSITIVE duration — the case that slips naive d<=0
+	// and bounds checks — so the fail-closed rule requires an error for all of these.
+	overflowCases := []string{"106752d", "213504d", "999999999d"}
 	for _, in := range overflowCases {
 		got, err := ParseTTL(in)
 		if err == nil {
 			t.Errorf("ParseTTL(%q) accepted overflow, returned %v (want error)", in, got)
 		}
 	}
-	// Sanity: a large-but-representable day count parses correctly.
+	// Sanity: large-but-representable day counts parse correctly.
 	want := 10000 * 24 * time.Hour
 	got, err := ParseTTL("10000d")
 	if err != nil {
@@ -55,6 +57,48 @@ func TestParseTTLRejectsOverflowDays(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("ParseTTL(%q) = %v, want %v", "10000d", got, want)
+	}
+	// Boundary: 106751d is the largest legal day count and must parse exactly.
+	want106751 := 106751 * 24 * time.Hour
+	got106751, err := ParseTTL("106751d")
+	if err != nil {
+		t.Fatalf("ParseTTL(%q) rejected largest-legal value: %v", "106751d", err)
+	}
+	if got106751 != want106751 {
+		t.Fatalf("ParseTTL(%q) = %v, want %v", "106751d", got106751, want106751)
+	}
+}
+
+func TestCheckConfigBounds(t *testing.T) {
+	cases := []struct {
+		name       string
+		defaultTTL time.Duration
+		maxTTL     time.Duration
+		wantErr    bool
+	}{
+		{"default < max", 168 * time.Hour, 720 * time.Hour, false},
+		{"default == max", 24 * time.Hour, 24 * time.Hour, false},
+		{"default > max", 720 * time.Hour, 24 * time.Hour, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := CheckConfigBounds(tc.defaultTTL, tc.maxTTL)
+			if tc.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantErr && err != nil {
+				// Error must name both values.
+				if !strings.Contains(err.Error(), tc.defaultTTL.String()) {
+					t.Errorf("error missing default_ttl value %q: %v", tc.defaultTTL, err)
+				}
+				if !strings.Contains(err.Error(), tc.maxTTL.String()) {
+					t.Errorf("error missing max_ttl value %q: %v", tc.maxTTL, err)
+				}
+			}
+		})
 	}
 }
 

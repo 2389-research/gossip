@@ -65,11 +65,26 @@ func Open(path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// DefaultConfig returns the out-of-the-box watercooler config used when
+// opening a fresh store. It is the single source of truth for seed values.
+func DefaultConfig() Config {
+	return Config{
+		DefaultTTL: 168 * time.Hour,
+		MaxTTL:     720 * time.Hour,
+		Moderators: []string{},
+	}
+}
+
 func (s *Store) ensureDefaultConfig(ctx context.Context) error {
+	dc := DefaultConfig()
+	mods, err := json.Marshal(dc.Moderators)
+	if err != nil {
+		return fmt.Errorf("store: marshal default moderators: %w", err)
+	}
 	defaults := map[string]string{
-		"default_ttl": (168 * time.Hour).String(),
-		"max_ttl":     (720 * time.Hour).String(),
-		"moderators":  "[]",
+		"default_ttl": dc.DefaultTTL.String(),
+		"max_ttl":     dc.MaxTTL.String(),
+		"moderators":  string(mods),
 	}
 	for k, v := range defaults {
 		if _, err := s.db.ExecContext(ctx,

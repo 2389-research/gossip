@@ -83,15 +83,34 @@ func newRootCmd(getenv func(string) string, now func() time.Time, out io.Writer)
 		Use:   "init",
 		Short: "Create or configure this watercooler's store",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s, path, err := a.openStore()
+			path, err := a.storePath()
 			if err != nil {
 				return err
 			}
-			defer s.Close()
-			cfg, err := s.Config(cmd.Context())
-			if err != nil {
-				return err
+
+			// Determine base config before opening (possibly creating) the store.
+			// Fresh path: use DefaultConfig. Existing path: open and read stored config.
+			// Note: there is a benign stat/open race on the fresh path — single-user CLI,
+			// do not engineer around it.
+			var baseCfg store.Config
+			_, statErr := os.Stat(path)
+			isFresh := os.IsNotExist(statErr)
+			if isFresh {
+				baseCfg = store.DefaultConfig()
+			} else {
+				s, err := store.Open(path)
+				if err != nil {
+					return err
+				}
+				baseCfg, err = s.Config(cmd.Context())
+				s.Close()
+				if err != nil {
+					return err
+				}
 			}
+
+			// Apply flags onto base config.
+			cfg := baseCfg
 			if initDefaultTTL != "" {
 				if cfg.DefaultTTL, err = gossip.ParseTTL(initDefaultTTL); err != nil {
 					return err
@@ -105,6 +124,19 @@ func newRootCmd(getenv func(string) string, now func() time.Time, out io.Writer)
 			if len(initMods) > 0 {
 				cfg.Moderators = initMods
 			}
+
+			// Validate before any write. On the fresh path the store file does not
+			// exist yet; rejection here leaves nothing behind.
+			if err := gossip.CheckConfigBounds(cfg.DefaultTTL, cfg.MaxTTL); err != nil {
+				return err
+			}
+
+			// Check passes: open (creating if fresh) and persist.
+			s, err := store.Open(path)
+			if err != nil {
+				return err
+			}
+			defer s.Close()
 			if err := s.SetConfig(cmd.Context(), cfg); err != nil {
 				return err
 			}

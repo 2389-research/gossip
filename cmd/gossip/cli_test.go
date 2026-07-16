@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -103,6 +104,78 @@ func TestCLIInitConfiguresModerators(t *testing.T) {
 	out, _ = runCLI(t, envMod, now, "whoami")
 	if !strings.Contains(out, "moderator: yes") {
 		t.Fatalf("whoami must show moderator status:\n%s", out)
+	}
+}
+
+// TestInitRejectsFreshPathWhenDefaultExceedsMax verifies that init with
+// default_ttl > max_ttl fails AND leaves no store file on a fresh path.
+func TestInitRejectsFreshPathWhenDefaultExceedsMax(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "gossip.db")
+	env := map[string]string{}
+	out, err := runCLI(t, env, time.Now(), "init", "--db", dbPath, "--default-ttl", "720h", "--max-ttl", "24h")
+	if err == nil {
+		t.Fatalf("expected error, got success:\n%s", out)
+	}
+	// Error must mention both values.
+	if !strings.Contains(err.Error(), "720h") && !strings.Contains(out, "720h") {
+		t.Errorf("error must mention 720h0m0s; got err=%v out=%q", err, out)
+	}
+	if !strings.Contains(err.Error(), "24h") && !strings.Contains(out, "24h") {
+		t.Errorf("error must mention 24h0m0s; got err=%v out=%q", err, out)
+	}
+	// Store file must NOT exist.
+	if _, statErr := os.Stat(dbPath); !os.IsNotExist(statErr) {
+		t.Fatalf("store file must not exist after rejected fresh init, but os.Stat returned: %v", statErr)
+	}
+}
+
+// TestInitExistingStoreRejectedAndUntouched verifies that init with resolved
+// default_ttl > stored max_ttl fails and leaves the stored config unchanged.
+func TestInitExistingStoreRejectedAndUntouched(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "gossip.db")
+	now := time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC)
+	env := map[string]string{}
+
+	// First init: default=24h, max=48h.
+	if out, err := runCLI(t, env, now, "init", "--db", dbPath, "--default-ttl", "24h", "--max-ttl", "48h"); err != nil {
+		t.Fatalf("first init: %v\n%s", err, out)
+	}
+
+	// Second init: only set default=72h; max not provided so it resolves to stored 48h.
+	// 72h > 48h => should fail.
+	out, err := runCLI(t, env, now, "init", "--db", dbPath, "--default-ttl", "72h")
+	if err == nil {
+		t.Fatalf("expected error when resolved default_ttl > stored max_ttl, got success:\n%s", out)
+	}
+
+	// Third init: no TTL flags — should succeed and report the original 24h/48h.
+	out, err = runCLI(t, env, now, "init", "--db", dbPath)
+	if err != nil {
+		t.Fatalf("third init (no flags): %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "default_ttl 24h0m0s") {
+		t.Errorf("default_ttl must still be 24h0m0s after rejected second init:\n%s", out)
+	}
+	if !strings.Contains(out, "max_ttl 48h0m0s") {
+		t.Errorf("max_ttl must still be 48h0m0s after rejected second init:\n%s", out)
+	}
+}
+
+// TestInitEqualityAccepted verifies that default_ttl == max_ttl is a valid config.
+func TestInitEqualityAccepted(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "gossip.db")
+	now := time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC)
+	env := map[string]string{}
+
+	out, err := runCLI(t, env, now, "init", "--db", dbPath, "--default-ttl", "24h", "--max-ttl", "24h")
+	if err != nil {
+		t.Fatalf("init with equal TTLs: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "default_ttl 24h0m0s") {
+		t.Errorf("output must show default_ttl 24h0m0s:\n%s", out)
+	}
+	if !strings.Contains(out, "max_ttl 24h0m0s") {
+		t.Errorf("output must show max_ttl 24h0m0s:\n%s", out)
 	}
 }
 
