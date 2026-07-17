@@ -70,6 +70,7 @@ func newRootCmd(getenv func(string) string, now func() time.Time, out io.Writer)
 		Use:           "gossip",
 		Short:         "Share gossip at the agentic watercooler",
 		Long:          "GOssip: labeled, decaying, evidence-badged hearsay in a shared SQLite file.\nIdentity is DECLARED via GOSSIP_ACTOR_ID/GOSSIP_PRINCIPAL_ID, not authenticated.",
+		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
