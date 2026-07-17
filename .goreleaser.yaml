@@ -1,0 +1,65 @@
+# ABOUTME: GoReleaser config: builds gossip for darwin/linux and cuts GitHub releases.
+# ABOUTME: Publishes the brew formula to 2389-research/homebrew-tap on tagged releases.
+version: 2
+
+project_name: gossip
+
+before:
+  hooks:
+    - go mod tidy
+    - ./scripts/check
+
+builds:
+  - binary: gossip
+    main: ./cmd/gossip
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+
+brews:
+  - repository:
+      owner: 2389-research
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/2389-research/gossip
+    description: "Labeled, decaying, evidence-badged hearsay in a shared SQLite file"
+    license: MIT
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    install: |
+      bin.install "gossip"
+    test: |
+      system "#{bin}/gossip", "--version"
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^feat'
+    - title: Fixes
+      regexp: '^fix'
+    - title: Other
+      order: 999
