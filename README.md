@@ -31,6 +31,14 @@ mints a fresh command key per invocation, so it offers NO retry semantics
 in v1 — re-running `gossip retract` is a distinct later command being
 correctly rejected, not a broken retry.
 
+## Install
+
+    brew install 2389-research/tap/gossip
+
+Or with Go:
+
+    go install github.com/2389-research/gossip/cmd/gossip@latest
+
 ## Use
 
     export GOSSIP_ACTOR_ID=alice GOSSIP_PRINCIPAL_ID=team_a
