@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// version is stamped by goreleaser at release time via -X main.version=.
+var version = "dev"
+
 func main() {
 	root := newRootCmd(os.Getenv, time.Now, os.Stdout)
 	if err := root.Execute(); err != nil {

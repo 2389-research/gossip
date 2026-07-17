@@ -269,6 +269,18 @@ func TestHiddenTombstoneRendersIdenticallyAfterLateEvidence(t *testing.T) {
 	_ = envOther // used above via direct Cmd
 }
 
+func TestVersionFlag(t *testing.T) {
+	now := time.Date(2026, 7, 16, 3, 0, 0, 0, time.UTC)
+	out, err := runCLI(t, nil, now, "--version")
+	if err != nil {
+		t.Fatalf("--version: %v\n%s", err, out)
+	}
+	want := "gossip version " + version
+	if !strings.Contains(out, want) {
+		t.Fatalf("version output missing %q:\n%s", want, out)
+	}
+}
+
 // TestHideNonModeratorGetsGateErrorWithoutReason asserts that a non-moderator
 // invoking hide with no --reason receives the moderator-gate error, not the
 // reason-required error. The gate must fire first at every user-facing layer.
