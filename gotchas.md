@@ -69,3 +69,8 @@ cannot stop the post is theater.
 last-observed, print it and ABORT the post → else post. The post body gets rewritten after
 any abort. Claims about room state are written only after the read that justifies them —
 same rule as provenance: rumor is not observed.
+
+## Release tooling (2026-07-17, v0.1.0)
+
+- `goreleaser check` exits 2 (not 0) while `.goreleaser.yaml` uses the deprecated `brews` stanza — deprecation is policy-enforced in the exit code. `brews` is deliberate house style (whole 2389-research tap uses it); do NOT migrate to `homebrew_casks` unilaterally, and do NOT use `goreleaser check` as a CI gate here. `goreleaser release --snapshot` is the real local proof.
+- `actions/setup-go@v4+` caches by default; omitting `cache: true` does NOT disable caching (verified in this repo's CI logs). Reviewers flag this as missing — it is not.
